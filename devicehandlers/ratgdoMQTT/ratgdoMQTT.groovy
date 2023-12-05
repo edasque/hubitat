@@ -33,7 +33,7 @@ preferences {
         input name: "ipAddr", type: "text", title: "IP Address of MQTT broker", required: true
         input name: "ipPort", type: "text", title: "Port # of MQTT broker", defaultValue: "1883", required: true
         input name: "username", type: "text", title: "MQTT Username:", description: "(blank if none)", required: false
-	    input name: "password", type: "password", title: "MQTT Password:", description: "(blank if none)", required: false
+        input name: "password", type: "password", title: "MQTT Password:", description: "(blank if none)", required: false
         input name: "retryTime", type: "number", title: "Number of seconds between retries to connect if broker goes down", defaultValue: 300, required: true
         input name: "refreshStats", type: "bool", title: "Refresh ratgo stats on a schedule?", defaultValue: false, required: true
         input name: "refreshTime", type: "number", title: "If using refresh, refresh this number of minutes", defaultValue: 5, range: "1..59", required: true
@@ -44,10 +44,15 @@ preferences {
      }
   }
 }
+import groovy.transform.Field
+
+@Field String ratgdo_topic_prefix = "ratgdo"
+@Field String haDiscoveryPrefix = "homeassistant"
 
 def setVersion(){
     state.name = "ratgdo MQTT"
-	state.version = "0.9.0 - RATGDO MQTT Device Handler version"   
+    state.version = "0.9.3 - RATGDO MQTT Device Handler version"
+    state.unique_id = "Riker" 
 }
 
 void installed() {
@@ -60,10 +65,10 @@ void parse(String description) {
     debuglog "parse: " + description
 
     topicFull=interfaces.mqtt.parseMessage(description).topic
-	def topic=topicFull.split('/')
+    def topic=topicFull.split('/')
     /*
-	//def topicCount=topic.size()
-	//def payload=interfaces.mqtt.parseMessage(description).payload.split(',')
+    //def topicCount=topic.size()
+    //def payload=interfaces.mqtt.parseMessage(description).payload.split(',')
     //log.debug "Desc.payload: " + interfaces.mqtt.parseMessage(description).payload
     //if (payload[0].startsWith ('{')) json="true" else json="false"
     //log.debug "json= " + json
@@ -74,13 +79,39 @@ void parse(String description) {
     */
 
     log.debug "Got message from topic: " + topicFull
+    log.debug "Got message from topic: " + topic
 
     int topicCount = topic.size()
 
-    log.debug "Topic size: " + size
+    log.debug "Topic size: " + topicCount
     
     def message=interfaces.mqtt.parseMessage(description).payload
     if (message) {
+
+        if (topicFull.startsWith("${haDiscoveryPrefix}/cover/${doorName}/config")) {
+            debuglog "Got HA Discovery message: " + message
+            jsonVal=parseJson(message)
+            state.unique_id=jsonVal.unique_id
+            state.manufacturer=jsonVal.device.manufacturer
+            // Could look like this:
+            
+            // {
+            //     "name":"Door",
+            //     "unique_id":"Riker",
+            //     "device_class":"garage",
+            //     "device": {
+            //         "name":"150",
+            //         "identifiers":"Riker",
+            //         "manufacturer":"Paul Wieland",
+            //         "model":"ratgdo",
+            //         "sw_version":"2.5",
+            //         "configuration_url":"http://192.168.7.230/"
+            //     }
+            // }
+            
+            // getConfig(message)
+        } else
+
         if (topicCount >3 && topic[2] == "status" && topic[3] == "door") {
             debuglog "Got NG door status message: " + message
             getDoorStatus(message)
@@ -311,10 +342,10 @@ void requestStatus() {
     watchDog()
     debuglog "Getting status and config..."
     //Garadget requires sending a command to force it to update the config topic
-    interfaces.mqtt.publish("ratgdo/${doorName}/command", "get-config")
+    interfaces.mqtt.publish("${ratgdo_topic_prefix}/${doorName}/command", "get-config")
     pauseExecution(1000)
     //Garadget requires sending a command to force it to update the status topic (unless there is a door event)
-    interfaces.mqtt.publish("ratgdo/${doorName}/command", "get-status")
+    interfaces.mqtt.publish("${ratgdo_topic_prefix}/${doorName}/command", "get-status")
 }
 void updated() {
     infolog "updated..."
@@ -348,19 +379,31 @@ void initialize() {
         mqttbroker = "tcp://" + ipAddr + ":" + ipPort
         mqttclientname = "Hubitat MQTT " + doorName
         mqttInt.connect(mqttbroker, mqttclientname, username,password)
+        // mqipInt.connect(mqttbroker, mqttclientname, username,password,lastWillTopic: "/my/last/will",
+        //                 lastWillQos: 0,
+        //                 lastWillMessage: "I died")
+
         //give it a chance to start
         pauseExecution(1000)
-        infolog "connection established..."
+        infolog "MQTT connection established..."
+
+        // sendEvent(name: "availability", value: "online")
+
         //subscribe to status and config topics
         // mqttInt.subscribe("ratgdo/${doorName}/status")
-        mqttInt.subscribe("ratgdo/${doorName}/config")
+        // mqttInt.subscribe("ratgdo/${doorName}/config")
 
         // added for ratgo
-        mqttInt.subscribe("ratgdo/${doorName}/status/door")
-        mqttInt.subscribe("ratgdo/${doorName}/status/lock")
-        mqttInt.subscribe("ratgdo/${doorName}/status/light")
-        mqttInt.subscribe("ratgdo/${doorName}/status/availability")
-        mqttInt.subscribe("ratgdo/${doorName}/status/obstruction")
+
+        // ha_autodiscovery subscriptions
+        mqttInt.subscribe("${haDiscoveryPrefix}/cover/${doorName}/config")
+
+        // state change subscriptions
+        mqttInt.subscribe("${ratgdo_topic_prefix}/${doorName}/status/door")
+        mqttInt.subscribe("${ratgdo_topic_prefix}/${doorName}/status/lock")
+        mqttInt.subscribe("${ratgdo_topic_prefix}/${doorName}/status/light")
+        mqttInt.subscribe("${ratgdo_topic_prefix}/${doorName}/status/availability")
+        mqttInt.subscribe("${ratgdo_topic_prefix}/${doorName}/status/obstruction")
 
     } catch(e) {
         log.warn "${device.label?device.label:device.name}: MQTT initialize error: ${e.message}"
@@ -388,23 +431,23 @@ void configure(){
     def json = new groovy.json.JsonOutput().toJson(options)
     debuglog json
     //write configuration to MQTT broker
-    interfaces.mqtt.publish("ratgdo/${doorName}/set-config", json)
+    interfaces.mqtt.publish("${ratgdo_topic_prefix}/${doorName}/set-config", json)
     //refresh config from broker
-    interfaces.mqtt.publish("ratgdo/${doorName}/command", "get-config") 
+    interfaces.mqtt.publish("${ratgdo_topic_prefix}/${doorName}/command", "get-config") 
 }
 
 void open() {
     infolog "Open command sent..."
     watchDog()
-    interfaces.mqtt.publish("ratgdo/${doorName}/command/door", "open")
+    interfaces.mqtt.publish("${ratgdo_topic_prefix}/${doorName}/command/door", "open")
 }
 void close() {
     infolog "Close command sent..."
     watchDog()
-    interfaces.mqtt.publish("ratgdo/${doorName}/command/door", "close")
+    interfaces.mqtt.publish("${ratgdo_topic_prefix}/${doorName}/command/door", "close")
 }
 // def stop(){
-// 	infolog "Stop command sent..."
+//     infolog "Stop command sent..."
 //     watchDog()
 //     interfaces.mqtt.publish("ratgdo/${doorName}/command", "stop")
 // }
@@ -412,28 +455,28 @@ void close() {
 def lock(){
     infolog "Lock command sent..."
     watchDog()
-    interfaces.mqtt.publish("ratgdo/${doorName}/command/lock", "lock")
+    interfaces.mqtt.publish("${ratgdo_topic_prefix}/${doorName}/command/lock", "lock")
 }
 
 def unlock(){
     infolog "Unlock command sent..."
     watchDog()
-    interfaces.mqtt.publish("ratgdo/${doorName}/command/lock", "unlock")
+    interfaces.mqtt.publish("${ratgdo_topic_prefix}/${doorName}/command/lock", "unlock")
 }
 
 void on() {
     infolog "Light on command sent..."
     watchDog()
-    interfaces.mqtt.publish("ratgdo/${doorName}/command/light", "on")
+    interfaces.mqtt.publish("${ratgdo_topic_prefix}/${doorName}/command/light", "on")
     // debuglog "On sent, turn garage light on..."
-	// open()
+    // open()
 }
 void off() {
     infolog "Light off command sent..."
     watchDog()
-    interfaces.mqtt.publish("ratgdo/${doorName}/command/light", "off")
+    interfaces.mqtt.publish("${ratgdo_topic_prefix}/${doorName}/command/light", "off")
     // debuglog "Off sent, turn garage light off..."  
-	// close()
+    // close()
 }
 
 
@@ -446,7 +489,7 @@ def watchDog() {
     }
 }
 void mqttClientStatus(String message) {
-	log.warn "${device.label?device.label:device.name}: **** Received status message: ${message} ****"
+    log.warn "${device.label?device.label:device.name}: **** Received status message: ${message} ****"
     if (message.contains ("Connection lost")) {
         connectionLost()
     }
@@ -469,23 +512,23 @@ def logsOff(){
 }
 def debuglog(statement)
 {   
-	def logL = 0
+    def logL = 0
     if (logLevel) logL = logLevel.toInteger()
     if (logL == 0) {return}//bail
     else if (logL >= 2)
-	{
-		log.debug("${device.label?device.label:device.name}: " + statement)
-	}
+    {
+        log.debug("${device.label?device.label:device.name}: " + statement)
+    }
 }
 def infolog(statement)
 {       
-	def logL = 0
+    def logL = 0
     if (logLevel) logL = logLevel.toInteger()
     if (logL == 0) {return}//bail
     else if (logL >= 1)
-	{
-		log.info("${device.label?device.label:device.name}: " + statement)
-	}
+    {
+        log.info("${device.label?device.label:device.name}: " + statement)
+    }
 }
 def getLogLevels(){
     return [["0":"None"],["1":"Running"],["2":"NeedHelp"]]
