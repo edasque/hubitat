@@ -62,7 +62,7 @@ void installed() {
 // Parse incoming device messages to generate events
 void parse(String description) {
 
-    debuglog "parse: " + description
+    log.debug "parse: " + description
 
     topicFull=interfaces.mqtt.parseMessage(description).topic
     def topic=topicFull.split('/')
@@ -78,23 +78,40 @@ void parse(String description) {
     //top=interfaces.mqtt.parseMessage(description).topic
     */
 
-    log.debug "Got message from topic: " + topicFull
-    log.debug "Got message from topic: " + topic
+    debuglog "Got message from topic: " + topicFull
+    debuglog "Got message from topic: " + topic
 
     int topicCount = topic.size()
 
-    log.debug "Topic size: " + topicCount
+    debuglog "Topic size: " + topicCount
     
     def message=interfaces.mqtt.parseMessage(description).payload
     if (message) {
+        // debuglog "Got message from topic: " + message
+        // debuglog "Is it a HA_discovery message: "+topicFull+" == "+("${haDiscoveryPrefix}/cover/${doorName}/config") + "?"
+        // debuglog "Is it a HA_discovery message? "+topicFull.startsWith("${haDiscoveryPrefix}/cover/${doorName}/config")
 
+        // This is a Home Assistant Discovery message
         if (topicFull.startsWith("${haDiscoveryPrefix}/cover/${doorName}/config")) {
-            debuglog "Got HA Discovery message: " + message
+            debuglog "Got Home Assistant Discovery message: " + message
+
+
             jsonVal=parseJson(message)
-            state.unique_id=jsonVal.unique_id
-            state.manufacturer=jsonVal.device.manufacturer
+            debuglog "JSON: " + jsonVal
+
+            if (jsonVal.name == doorName) {
+                debuglog "The HA discovery message w/ name=${jsonVal.name} is for this device (${doorName}) - changing state"
+
+                state.unique_id=jsonVal.unique_id
+                state.manufacturer=jsonVal.device.manufacturer
+                state.model = jsonVal.device.model
+                state.sw_version = jsonVal.device.sw_version
+                state.configuration_url = jsonVal.device.configuration_url
+                
+            } else {
+                debuglog "The HA discovery message w/ name=${jsonVal.name} is not for this device (${doorName}) - ignoring"
+            }
             // Could look like this:
-            
             // {
             //     "name":"Door",
             //     "unique_id":"Riker",
@@ -108,11 +125,8 @@ void parse(String description) {
             //         "configuration_url":"http://192.168.7.230/"
             //     }
             // }
-            
             // getConfig(message)
-        } else
-
-        if (topicCount >3 && topic[2] == "status" && topic[3] == "door") {
+        } else if (topicCount >3 && topic[2] == "status" && topic[3] == "door") {
             debuglog "Got NG door status message: " + message
             getDoorStatus(message)
         } else if (topicCount >3 && topic[2] == "status" && topic[3] == "lock") {
