@@ -49,10 +49,17 @@ import groovy.transform.Field
 @Field String ratgdo_topic_prefix = "ratgdo"
 @Field String haDiscoveryPrefix = "homeassistant"
 
+@Field statusMethods = [
+    "door": this.&getDoorStatus,
+    "lock": this.&getLockStatus,
+    "light": this.&getLightStatus,
+    "obstruction": this.&getObstructionStatus,
+    "availability": this.&getAvailabilityStatus
+]
+
 def setVersion(){
     state.name = "ratgdo MQTT"
     state.version = "0.9.3 - RATGDO MQTT Device Handler version"
-    state.unique_id = "Riker" 
 }
 
 void installed() {
@@ -62,21 +69,10 @@ void installed() {
 // Parse incoming device messages to generate events
 void parse(String description) {
 
-    log.debug "parse: " + description
+    debuglog "parse: " + description
 
     topicFull=interfaces.mqtt.parseMessage(description).topic
     def topic=topicFull.split('/')
-    /*
-    //def topicCount=topic.size()
-    //def payload=interfaces.mqtt.parseMessage(description).payload.split(',')
-    //log.debug "Desc.payload: " + interfaces.mqtt.parseMessage(description).payload
-    //if (payload[0].startsWith ('{')) json="true" else json="false"
-    //log.debug "json= " + json
-    //log.debug "topic0: " + topic[0]
-    //log.debug "topic1: " + topic[1]
-    //debuglog "topic2: " + topic[2]
-    //top=interfaces.mqtt.parseMessage(description).topic
-    */
 
     debuglog "Got message from topic: " + topicFull
     debuglog "Got message from topic: " + topic
@@ -93,11 +89,10 @@ void parse(String description) {
 
         // This is a Home Assistant Discovery message
         if (topicFull.startsWith("${haDiscoveryPrefix}/cover/${doorName}/config")) {
-            debuglog "Got Home Assistant Discovery message: " + message
-
+            infolog "Got Home Assistant Discovery message: " + message
 
             jsonVal=parseJson(message)
-            debuglog "JSON: " + jsonVal
+            debuglog "JSON from HA Assistant Discover Message: " + jsonVal
 
             if (jsonVal.name == doorName) {
                 debuglog "The HA discovery message w/ name=${jsonVal.name} is for this device (${doorName}) - changing state"
@@ -107,11 +102,11 @@ void parse(String description) {
                 state.model = jsonVal.device.model
                 state.sw_version = jsonVal.device.sw_version
                 state.configuration_url = jsonVal.device.configuration_url
-                
+
             } else {
                 debuglog "The HA discovery message w/ name=${jsonVal.name} is not for this device (${doorName}) - ignoring"
             }
-            // Could look like this:
+            // HA Discovery message looks like this:
             // {
             //     "name":"Door",
             //     "unique_id":"Riker",
@@ -125,34 +120,23 @@ void parse(String description) {
             //         "configuration_url":"http://192.168.7.230/"
             //     }
             // }
-            // getConfig(message)
-        } else if (topicCount >3 && topic[2] == "status" && topic[3] == "door") {
-            debuglog "Got NG door status message: " + message
-            getDoorStatus(message)
-        } else if (topicCount >3 && topic[2] == "status" && topic[3] == "lock") {
-            debuglog "Got NG lock status message: " + message
-            getLockStatus(message)
-        } else if (topicCount >3 && topic[2] == "status" && topic[3] == "light") {
-            debuglog "Got NG light status message: " + message
-            getLightStatus(message)
-        } else if (topicCount >3 && topic[2] == "status" && topic[3] == "obstruction") {
-            debuglog "Got NG obstruction status message: " + message
-            getObstructionStatus(message)
-        } else if (topicCount >3 && topic[2] == "status" && topic[3] == "availability") {
-            debuglog "Got NG availability status message: " + message
-            getAvailabilityStatus(message)
 
+            // getConfig(message)
+        } else if (topicCount > 3 && topic[2] == "status") {
+            def method = statusMethods[topic[3]]
+            if (method) {
+                debuglog "Got NG ${topic[3]} status message: " + message
+                method(message)
+                } else {
+                    debuglog "Unhandled topic..." + topicFull
+                }
         } else {
-            debuglog "Unhandled topic..." + topicFull
+            debuglog "Empty payload"
         }
-    } else {
-        debuglog "Empty payload"
     }
 }
 
 void getDoorStatus(status) {
-    
-    
     if (status != device.currentValue("door")) { 
         infolog "Incoming MQTT Status via prefix/status/door/ : " + status 
         if (status == "closed") {
