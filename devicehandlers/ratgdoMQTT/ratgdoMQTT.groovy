@@ -49,6 +49,7 @@ import groovy.transform.Field
 @Field String ratgdo_topic_prefix = "ratgdo"
 @Field String haDiscoveryPrefix = "homeassistant"
 
+// The different status messages and their corresponding methods
 @Field statusMethods = [
     "door": this.&getDoorStatus,
     "lock": this.&getLockStatus,
@@ -94,17 +95,30 @@ void parse(String description) {
             jsonVal=parseJson(message)
             debuglog "JSON from HA Assistant Discover Message: " + jsonVal
 
-            if (jsonVal.name == doorName) {
-                debuglog "The HA discovery message w/ name=${jsonVal.name} is for this device (${doorName}) - changing state"
+            // debuglog "Device? " + jsonVal.hasProperty('device')
+            // debuglog "Device " + jsonVal.device
+            // debuglog "Name? "+ jsonVal.device.hasProperty('name')
+            // debuglog "Name "+ jsonVal.device.name
+            // debuglog "Empty? " + jsonVal.device?.name?.isNotEmpty()
 
-                state.unique_id=jsonVal.unique_id
-                state.manufacturer=jsonVal.device.manufacturer
-                state.model = jsonVal.device.model
-                state.sw_version = jsonVal.device.sw_version
-                state.configuration_url = jsonVal.device.configuration_url
+            if (jsonVal.device!=null && jsonVal.device.name!=null) {
 
+                deviceName = jsonVal.device.name
+
+                if (deviceName == doorName) {
+                    debuglog "The HA discovery message w/ name=${deviceName} is for this device (${doorName}) - changing state"
+
+                    state.unique_id=jsonVal.unique_id
+                    state.manufacturer=jsonVal.device.manufacturer
+                    state.model = jsonVal.device.model
+                    state.sw_version = jsonVal.device.sw_version
+                    state.configuration_url = jsonVal.device.configuration_url
+
+                } else {
+                    debuglog "The HA discovery message w/ name=${jsonVal.name} is not for this device (${doorName}) - ignoring"
+                }
             } else {
-                debuglog "The HA discovery message w/ name=${jsonVal.name} is not for this device (${doorName}) - ignoring"
+                debuglog "The HA discovery message does not have a device.name property - ignoring"
             }
             // HA Discovery message looks like this:
             // {
