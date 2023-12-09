@@ -177,6 +177,7 @@ void getAvailabilityStatus(status) {
         infolog "Incoming MQTT Status via prefix/status/availability/ : " + status 
         if (status == "offline") {
             sendEvent(name: "availability", value: "offline")
+
         } else if (status == "online") {
             sendEvent(name: "availability", value: "online")
         } else {
