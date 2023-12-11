@@ -1,4 +1,13 @@
 {
   "author": "Erik Dasque",
-  "gitHubUrl": "https://github.com/edasque/hubitat"
+  "gitHubUrl": "https://github.com/edasque/hubitat",
+  "packages": [
+    {
+      "id": "acb4b7c4-9e6b-40a6-b5bc-b58efacde4bf",
+      "name": "ratgo (MQTT firware)",
+      "category": "Integrations",
+      "location": "https://raw.githubusercontent.com/edasque/hubitat/main/devicehandlers/ratgdoMQTT/packageManifest.json",
+      "description": "Control your ratgdo MyQ alternative"
+    }
+  ]
 }
