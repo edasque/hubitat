@@ -13,7 +13,7 @@
       "name": "ratgdo MQTT",
       "namespace": "edasque",
       "location": "https://raw.githubusercontent.com/edasque/hubitat/main/devicehandlers/ratgdoMQTT/ratgdoMQTT.groovy",
-      "required": false
+      "required": true
     }
   ]
 }
