@@ -4,7 +4,8 @@
  *
  *  baesd on Garadget MQTT Device Handler by J.R. Farrar (jrfarrar)
  *
- * 1.0.0 - 12/10/23 - Initial Release
+ * 0.9.6 - 12/11/23 - Test of HPM update
+ * 0.9.5 - 12/11/23 - Initial HPM Release
  */
 
 metadata {
@@ -60,7 +61,7 @@ import groovy.transform.Field
 
 def setVersion(){
     state.name = "ratgdo MQTT"
-    state.version = "0.9.3 - RATGDO MQTT Device Handler version"
+    state.version = "0.9.6 - RATGDO MQTT Device Handler version"
 }
 
 void installed() {
