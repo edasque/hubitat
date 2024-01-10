@@ -1,9 +1,9 @@
-
 /**
  *  Ratgdo MQTT Device Handler
  *
  *  baesd on Garadget MQTT Device Handler by J.R. Farrar (jrfarrar)
  *
+ * 0.9.7 = 12/12/20 - Light is now a child device
  * 0.9.6 - 12/11/23 - Test of HPM update
  * 0.9.5 - 12/11/23 - Initial HPM Release
  */
@@ -18,8 +18,11 @@ metadata {
         capability "Contact Sensor"
         capability "Refresh"
         capability "Configuration"
-        capability "Light"
+//        capability "Light"
         capability "Lock"
+
+        command "childSwitchOn"
+        command "childSwitchOff"
 
         attribute "light", "enum", ["on","off"]
         attribute "lock", "enum", ["locked","unlocked"]
@@ -518,6 +521,36 @@ void connectionLost(){
         pauseExecution(delayTime)
     }
 }
+
+def fetchChild(String type){
+    String thisId = device.id
+    def cd = getChildDevice("${thisId}-${type}")
+    if (!cd) {
+        cd = addChildDevice("hubitat", "Generic Component ${type}", "${thisId}-${type}", [name: "${device.displayName} ${type}", isComponent: true])
+        //set initial attribute values, with a real device you would not do this here...
+        List<Map> defaultValues = []
+        switch (type) {
+            case "Switch":
+                defaultValues.add([name:"switch", value:"off", descriptionText:"set initial switch value"])
+                break
+//            case "Dimmer":
+//                defaultValues.add([name:"switch", value:"off", descriptionText:"set initial switch value"])
+//                defaultValues.add([name:"level", value:50, descriptionText:"set initial level value", unit:"%"])
+//                break
+//            case "Temperature Sensor" :
+//                String unit = "°${location.temperatureScale}"
+//                BigInteger value = (unit == "°F") ? 70.0 : 21.0
+//                defaultValues.add([name:"temperature", value:value, descriptionText:"set initial temperature value", unit:unit])
+//                break
+            default :
+                log.warn "unable to set initial values for type:${type}"
+                break
+        }
+        cd.parse(defaultValues)
+    }
+    return cd 
+}
+
     
 //Logging below here
 def logsOff(){
