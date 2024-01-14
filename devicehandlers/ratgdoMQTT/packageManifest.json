@@ -1,7 +1,7 @@
 {
   "packageName": "ratgdo (MQTT firmware)",
   "author": "Erik Dasque",
-  "version": "0.9.7",
+  "version": "0.9.7.1",
   "minimumHEVersion": "2.3.6.146",
   "dateReleased": "2024-01-10",
   "tags": [ "Garage Doors" ],
