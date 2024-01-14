@@ -4,7 +4,7 @@
  *
  *  baesd on Garadget MQTT Device Handler by J.R. Farrar (jrfarrar)
  *
- * 0.9.7.1 - 1/14/24 - Code cleanup and removing of old garadget code as well as support for producing a query message to the device
+ * 0.9.8 - 1/14/24 - Code cleanup and removing of old garadget code as well as support for producing a query message to the device
  * 0.9.7 - 1/10/24 - Code cleanup and removing of old garadget code as well as support for producing a query message to the device
  * 0.9.6 - 12/11/23 - Test of HPM update
  * 0.9.5 - 12/11/23 - Initial HPM Release

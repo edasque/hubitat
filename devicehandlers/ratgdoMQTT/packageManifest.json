@@ -1,13 +1,13 @@
 {
   "packageName": "ratgdo (MQTT firmware)",
   "author": "Erik Dasque",
-  "version": "0.9.7.1",
+  "version": "0.9.8",
   "minimumHEVersion": "2.3.6.146",
-  "dateReleased": "2024-01-10",
+  "dateReleased": "2024-01-14",
   "tags": [ "Garage Doors" ],
   "communityLink": "https://community.hubitat.com/t/wip-ratgdo-driver-mqtt-firmware/129078",
   "licenseFile": "https://raw.githubusercontent.com/edasque/hubitat/main/LICENSE",
-  "releaseNotes": "* 0.9.7.1 - 1/14/24 - Code cleanup and removing of old garadget code as well as support for producing a query message to the device",
+  "releaseNotes": "* 0.9.8 - 1/14/24 - Code cleanup and removing of old garadget code as well as support for producing a query message to the device",
   "drivers": [
     {
       "id": "151aa0c4-c53c-4a60-81e4-5a6719b7a349",
