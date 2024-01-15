@@ -4,12 +4,12 @@
  *
  *  baesd on Garadget MQTT Device Handler by J.R. Farrar (jrfarrar)
  *
- * 0.9.8 - 1/14/24 - Code cleanup and removing of old garadget code as well as support for producing a query message to the device
+ * 0.9.8 - 1/14/24 - Further cleanup of code & logging
  * 0.9.7 - 1/10/24 - Code cleanup and removing of old garadget code as well as support for producing a query message to the device
  * 0.9.6 - 12/11/23 - Test of HPM update
  * 0.9.5 - 12/11/23 - Initial HPM Release
  */
-
+git config pull.rebase false
 metadata {
     definition (name: "ratgdo MQTT", 
                 namespace: "edasque", 
@@ -63,7 +63,7 @@ import groovy.transform.Field
 
 def setVersion(){
     state.name = "ratgdo MQTT"
-    state.version = "0.9.7 - RATGDO MQTT Device Handler version"
+    state.version = "0.9.8 - RATGDO MQTT Device Handler version"
 }
 
 void installed() {
