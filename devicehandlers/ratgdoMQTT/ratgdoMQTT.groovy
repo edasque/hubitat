@@ -4,6 +4,8 @@
  *
  *  baesd on Garadget MQTT Device Handler by J.R. Farrar (jrfarrar)
  *
+ * 0.9.8 - 1/14/24 - Code cleanup and removing of old garadget code as well as support for producing a query message to the device
+ * 0.9.7 - 1/10/24 - Code cleanup and removing of old garadget code as well as support for producing a query message to the device
  * 0.9.6 - 12/11/23 - Test of HPM update
  * 0.9.5 - 12/11/23 - Initial HPM Release
  */
@@ -41,9 +43,9 @@ preferences {
         input name: "watchDogSched", type: "bool", title: "Check for connection to MQTT broker on a schedule?", defaultValue: false, required: true
         input name: "watchDogTime", type: "number", title: "This number of minutes to check for connection to MQTT broker", defaultValue: 15, range: "1..59", required: true
         input name: "logLevel",title: "IDE logging level",multiple: false,required: true,type: "enum", options: getLogLevels(), submitOnChange : false, defaultValue : "1"
-        }
-     }
-  }
+    }
+}
+               }
 }
 import groovy.transform.Field
 
@@ -51,7 +53,7 @@ import groovy.transform.Field
 @Field String haDiscoveryPrefix = "homeassistant"
 
 // The different status messages and their corresponding methods
-@Field statusMethods = [
+@Field statusStates = [
     "door": this.&getDoorStatus,
     "lock": this.&getLockStatus,
     "light": this.&getLightStatus,
@@ -61,7 +63,7 @@ import groovy.transform.Field
 
 def setVersion(){
     state.name = "ratgdo MQTT"
-    state.version = "0.9.6 - RATGDO MQTT Device Handler version"
+    state.version = "0.9.7 - RATGDO MQTT Device Handler version"
 }
 
 void installed() {
@@ -71,17 +73,17 @@ void installed() {
 // Parse incoming device messages to generate events
 void parse(String description) {
 
-    debuglog "parse: " + description
+    debuglog "Method: parse(string description) description: " + description
 
     topicFull=interfaces.mqtt.parseMessage(description).topic
     def topic=topicFull.split('/')
 
     debuglog "Got message from topic: " + topicFull
-    debuglog "Got message from topic: " + topic
+    debuglog "Got message from topic (split): " + topic
 
     int topicCount = topic.size()
 
-    debuglog "Topic size: " + topicCount
+    debuglog "Topic elements: " + topicCount
     
     def message=interfaces.mqtt.parseMessage(description).payload
     if (message) {
@@ -136,17 +138,33 @@ void parse(String description) {
             //     }
             // }
 
-            // getConfig(message)
+        // This is a normal getConfig message - it has four parts:
+        // 0. The prefix (ratgdo)
+        // 1. The door name (doorName)
+        // 2. The method which is either config or status
+
+        // In the case of a config method, the fourth part is... ???
+        // } else if (topicCount > 3 && topic[2] == "config") {
+        //     def command = topic[3]
+        //     if (command == "config") {
+        //         debuglog "Got NG config message: " + message
+        //         getConfig(parseJson(message))
+        //     } else {
+        //         debuglog "Unhandled topic..." + topicFull
+        //     }
+        // In the case of a status method, the fourth part is state that changed
         } else if (topicCount > 3 && topic[2] == "status") {
-            def method = statusMethods[topic[3]]
-            if (method) {
-                debuglog "Got NG ${topic[3]} status message: " + message
-                method(message)
-                } else {
-                    debuglog "Unhandled topic..." + topicFull
+            def state = statusStates[topic[3]]
+            if (state) {
+                debuglog "Got ${topic[3]} status message from ${doorName}: " + message
+                state(message)
+            }
+                else
+                {
+                debuglog 'Unhandled topic...' + topicFull
                 }
         } else {
-            debuglog "Empty payload"
+            debuglog 'Empty payload'
         }
     }
 }
@@ -218,134 +236,130 @@ void getLightStatus(status) {
 }
 
 void getLockStatus(status) {
-    
-    
-    if (status != device.currentValue("light")) { 
+    if (status != device.currentValue("lock")) { 
         infolog "Incoming MQTT Status via prefix/status/lock/ : " + status 
-        if (status == "lock") {
+        if (status == "locked") {
             sendEvent(name: "lock", value: "locked")
-        } else if (status == "unlock") {
+        } else if (status == "unlocked") {
             sendEvent(name: "lock", value: "unlocked")
         } else {
             infolog "unknown status event for lock"
         }
-    }   
+    }
 }
+// //Handle status update topic
+// void getStatus(status) {
+//     if (status.status != device.currentValue("door")) { 
+//         infolog status.status 
+//         if (status.status == "closed") {
+//             sendEvent(name: "contact", value: "closed")
+//             sendEvent(name: "door", value: "closed")
+//             sendEvent(name: "stopped", value: "false")
+//         } else if (status.status == "open") {
+//             sendEvent(name: "contact", value: "open")
+//             sendEvent(name: "door", value: "open")
+//             sendEvent(name: "stopped", value: "false")
+//         } else if (status.status == "stopped") {
+//             sendEvent(name: "door", value: "stopped")
+//             sendEvent(name: "contact", value: "open")
+//             sendEvent(name: "stopped", value: "true")
+//         } else if (status.status == "opening") {
+//             sendEvent(name: "door", value: "opening")
+//             sendEvent(name: "contact", value: "open")
+//             sendEvent(name: "stopped", value: "false")
+//         } else if (status.status == "closing") {
+//             sendEvent(name: "door", value: "closing")
+//             sendEvent(name: "stopped", value: "false")
+//         } else {
+//             infolog "unknown status event"
+//         }
+//     }   
+//     //update device status if it has changed
+//     if (status.sensor != device.currentValue("sensor")) { sendEvent(name: "sensor", value: status.sensor) }
+//     if (status.signal != device.currentValue("signal")) { sendEvent(name: "signal", value: status.signal) }
+//     if (status.bright != device.currentValue("bright")) { sendEvent(name: "bright", value: status.bright) }
+//     if (status.time != device.currentValue("time")) { sendEvent(name: "time", value: status.time) }
+//     if (status.illuminance != device.currentValue("illuminance")) { sendEvent(name: "illuminance", value: status.bright) }
+//     //log
+//     debuglog "status: " + status.status
+//     debuglog "bright: " + status.bright
+//     debuglog "sensor: " + status.sensor
+//     debuglog "signal: " + status.signal
+//     debuglog "time: " + status.time
+// }
 
-
-
-//Handle status update topic
-void getStatus(status) {
-    if (status.status != device.currentValue("door")) { 
-        infolog status.status 
-        if (status.status == "closed") {
-            sendEvent(name: "contact", value: "closed")
-            sendEvent(name: "door", value: "closed")
-            sendEvent(name: "stopped", value: "false")
-        } else if (status.status == "open") {
-            sendEvent(name: "contact", value: "open")
-            sendEvent(name: "door", value: "open")
-            sendEvent(name: "stopped", value: "false")
-        } else if (status.status == "stopped") {
-            sendEvent(name: "door", value: "stopped")
-            sendEvent(name: "contact", value: "open")
-            sendEvent(name: "stopped", value: "true")
-        } else if (status.status == "opening") {
-            sendEvent(name: "door", value: "opening")
-            sendEvent(name: "contact", value: "open")
-            sendEvent(name: "stopped", value: "false")
-        } else if (status.status == "closing") {
-            sendEvent(name: "door", value: "closing")
-            sendEvent(name: "stopped", value: "false")
-        } else {
-            infolog "unknown status event"
-        }
-    }   
-    //update device status if it has changed
-    if (status.sensor != device.currentValue("sensor")) { sendEvent(name: "sensor", value: status.sensor) }
-    if (status.signal != device.currentValue("signal")) { sendEvent(name: "signal", value: status.signal) }
-    if (status.bright != device.currentValue("bright")) { sendEvent(name: "bright", value: status.bright) }
-    if (status.time != device.currentValue("time")) { sendEvent(name: "time", value: status.time) }
-    if (status.illuminance != device.currentValue("illuminance")) { sendEvent(name: "illuminance", value: status.bright) }
-    //log
-    debuglog "status: " + status.status
-    debuglog "bright: " + status.bright
-    debuglog "sensor: " + status.sensor
-    debuglog "signal: " + status.signal
-    debuglog "time: " + status.time
-}
 //Handle config update topic
-void getConfig(config) {
-    //
-    //Set some states for Garadget/Particle Info
-    //
-    debuglog "sys: " + config.sys + " - Particle Firmware Version"
-    state.sys = config.sys + " - Particle Firmware Version"
-    debuglog "ver: " + config.ver + " - Garadget firmware version"
-    state.ver = config.ver + " - Garadget firmware version"
-    debuglog "id: "  + config.id  + " - Garadget/Particle device ID"
-    state.id = config.id  + " - Garadget/Particle device ID"
-    debuglog "ssid: "+ config.ssid + " - WiFi SSID name"
-    state.ssid = config.ssid + " - WiFi SSID name"
-    //
-    //refresh and update configuration values
-    //
-    debuglog "rdt: " + config.rdt + " - sensor scan interval in mS (200-60,000, default 1,000)"
-    rdt = config.rdt
-    device.updateSetting("rdt", [value: "${rdt}", type: "number"])
-    sendEvent(name: "rdt", value: rdt)
-    //
-    debuglog "mtt: " + config.mtt + " - door moving time in mS from completely opened to completely closed (1,000 - 120,000, default 10,000)"
-    mtt = config.mtt
-    device.updateSetting("mtt", [value: "${mtt}", type: "number"])
-    sendEvent(name: "mtt", value: mtt)
-    //
-    debuglog "rlt: " + config.rlt + " - button press time mS, time for relay to keep contacts closed (10-2,000, default 300)"
-    rlt = config.rlt
-    device.updateSetting("rlt", [value: "${rlt}", type: "number"])
-    sendEvent(name: "rlt", value: rlt)
-    //
-    debuglog "rlp: " + config.rlp + " - delay between consecutive button presses in mS (10-5,000 default 1,000)"
-    rlp = config.rlp
-    device.updateSetting("rlp", [value: "${rlp}", type: "number"])
-    sendEvent(name: "rlp", value: rlp)
-    //
-    debuglog "srt: " + config.srt + " - reflection threshold below which the door is considered open (1-80, default 25)"
-    srt = config.srt
-    device.updateSetting("srt", [value: "${srt}", type: "number"])
-    sendEvent(name: "srt", value: srt)  
-    //
-    //nme is currently broken in Garadget firmware 1.2 - it does not honor it. It uses default device name.
-    debuglog "nme: " + config.nme + " - device name to be used in MQTT topic."
-    //nme = config.nme
-    //device.updateSetting("nme", [value: "${nme}", type: "text"])
-    //sendEvent(name: "nme", value: nme")
-    //
-    //Not tested setting the bitmap from HE - needs to be tested
-    debuglog "mqtt: " + config.mqtt + " - bitmap 0x01 - cloud enabled, 0x02 - mqtt enabled, 0x03 - cloud and mqtt enabled"
-    //mqtt = config.mqtt
-    //device.updateSetting("mqtt", [value: "${mqtt}", type: "text"])
-    //sendEvent(name: "mqtt", value: mqtt")
-    //
-    debuglog "mqip: " + config.mqip + " - MQTT broker IP address"    
-    mqip = config.mqip
-    device.updateSetting("mqip", [value: "${mqip}", type: "text"])
-    sendEvent(name: "mqip", value: mqip)
-    //
-    debuglog "mqpt: " + config.mqpt + " - MQTT broker port number"
-    mqpt = config.mqpt
-    device.updateSetting("mqpt", [value: "${mqpt}", type: "number"])
-    sendEvent(name: "mqpt", value: mqpt)
-    //
-    //See no need to implement changing the username as you can't change the password via the MQTT interface
-    debuglog "mqus: " + config.mqus + " - MQTT user"
-    //mqus = config.mqus
-    //
-    debuglog "mqto: " + config.mqto + " - MQTT timeout (keep alive) in seconds"
-    mqto = config.mqto
-    device.updateSetting("mqto", [value: "${mqto}", type: "number"])
-    sendEvent(name: "mqto", value: mqto)
-}
+// void getConfig(config) {
+//     //
+//     //Set some states for Garadget/Particle Info
+//     //
+//     debuglog "sys: " + config.sys + " - Particle Firmware Version"
+//     state.sys = config.sys + " - Particle Firmware Version"
+//     debuglog "ver: " + config.ver + " - Garadget firmware version"
+//     state.ver = config.ver + " - Garadget firmware version"
+//     debuglog "id: "  + config.id  + " - Garadget/Particle device ID"
+//     state.id = config.id  + " - Garadget/Particle device ID"
+//     debuglog "ssid: "+ config.ssid + " - WiFi SSID name"
+//     state.ssid = config.ssid + " - WiFi SSID name"
+//     //
+//     //refresh and update configuration values
+//     //
+//     debuglog "rdt: " + config.rdt + " - sensor scan interval in mS (200-60,000, default 1,000)"
+//     rdt = config.rdt
+//     device.updateSetting("rdt", [value: "${rdt}", type: "number"])
+//     sendEvent(name: "rdt", value: rdt)
+//     //
+//     debuglog "mtt: " + config.mtt + " - door moving time in mS from completely opened to completely closed (1,000 - 120,000, default 10,000)"
+//     mtt = config.mtt
+//     device.updateSetting("mtt", [value: "${mtt}", type: "number"])
+//     sendEvent(name: "mtt", value: mtt)
+//     //
+//     debuglog "rlt: " + config.rlt + " - button press time mS, time for relay to keep contacts closed (10-2,000, default 300)"
+//     rlt = config.rlt
+//     device.updateSetting("rlt", [value: "${rlt}", type: "number"])
+//     sendEvent(name: "rlt", value: rlt)
+//     //
+//     debuglog "rlp: " + config.rlp + " - delay between consecutive button presses in mS (10-5,000 default 1,000)"
+//     rlp = config.rlp
+//     device.updateSetting("rlp", [value: "${rlp}", type: "number"])
+//     sendEvent(name: "rlp", value: rlp)
+//     //
+//     debuglog "srt: " + config.srt + " - reflection threshold below which the door is considered open (1-80, default 25)"
+//     srt = config.srt
+//     device.updateSetting("srt", [value: "${srt}", type: "number"])
+//     sendEvent(name: "srt", value: srt)  
+//     //
+//     //nme is currently broken in Garadget firmware 1.2 - it does not honor it. It uses default device name.
+//     debuglog "nme: " + config.nme + " - device name to be used in MQTT topic."
+//     //nme = config.nme
+//     //device.updateSetting("nme", [value: "${nme}", type: "text"])
+//     //sendEvent(name: "nme", value: nme")
+//     //
+//     //Not tested setting the bitmap from HE - needs to be tested
+//     debuglog "mqtt: " + config.mqtt + " - bitmap 0x01 - cloud enabled, 0x02 - mqtt enabled, 0x03 - cloud and mqtt enabled"
+//     //mqtt = config.mqtt
+//     //device.updateSetting("mqtt", [value: "${mqtt}", type: "text"])
+//     //sendEvent(name: "mqtt", value: mqtt")
+//     //
+//     debuglog "mqip: " + config.mqip + " - MQTT broker IP address"    
+//     mqip = config.mqip
+//     device.updateSetting("mqip", [value: "${mqip}", type: "text"])
+//     sendEvent(name: "mqip", value: mqip)
+//     //
+//     debuglog "mqpt: " + config.mqpt + " - MQTT broker port number"
+//     mqpt = config.mqpt
+//     device.updateSetting("mqpt", [value: "${mqpt}", type: "number"])
+//     sendEvent(name: "mqpt", value: mqpt)
+//     //
+//     //See no need to implement changing the username as you can't change the password via the MQTT interface
+//     debuglog "mqus: " + config.mqus + " - MQTT user"
+//     //mqus = config.mqus
+//     //
+//     debuglog "mqto: " + config.mqto + " - MQTT timeout (keep alive) in seconds"
+//     mqto = config.mqto
+//     device.updateSetting("mqto", [value: "${mqto}", type: "number"])
+//     sendEvent(name: "mqto", value: mqto)
+// }
 
 void refresh(){
     requestStatus()
@@ -354,18 +368,18 @@ void refresh(){
 //refresh data from status and config topics
 void requestStatus() {
     watchDog()
-    debuglog "Getting status and config..."
+    debuglog "Getting current status from ratgdo device..."
     //Garadget requires sending a command to force it to update the config topic
-    interfaces.mqtt.publish("${ratgdo_topic_prefix}/${doorName}/command", "get-config")
+    interfaces.mqtt.publish("${ratgdo_topic_prefix}/${doorName}/command", "query")
     pauseExecution(1000)
-    //Garadget requires sending a command to force it to update the status topic (unless there is a door event)
-    interfaces.mqtt.publish("${ratgdo_topic_prefix}/${doorName}/command", "get-status")
 }
 void updated() {
-    infolog "updated..."
+    infolog 'updated...'
     //write the configuration
+    
     configure()
-    //set schedules   
+
+    //set schedules
     unschedule()
     pauseExecution(1000)
     //schedule the watchdog to run in case the broker restarts
@@ -387,6 +401,8 @@ void uninstalled() {
 
 void initialize() {
     infolog "initialize..."
+    setVersion()
+
     try {
         //open connection
         def mqttInt = interfaces.mqtt
@@ -419,6 +435,8 @@ void initialize() {
         mqttInt.subscribe("${ratgdo_topic_prefix}/${doorName}/status/availability")
         mqttInt.subscribe("${ratgdo_topic_prefix}/${doorName}/status/obstruction")
 
+        requestStatus()
+
     } catch(e) {
         log.warn "${device.label?device.label:device.name}: MQTT initialize error: ${e.message}"
     }
@@ -432,31 +450,33 @@ void configure(){
     watchDog()
     
     //Build Option Map based on preferences
-    def options = [:]
-    if (rdt) options.rdt = rdt
-    if (mtt) options.mtt = mtt
-    if (rlt) options.rlt = rlt
-    if (rlp) options.rlp = rlp
-    if (srt) options.srt = srt
-    if (mqip) options.mqip = mqip
-    if (mqpt) options.mqpt = mqpt
-    if (mqto) options.mqto = mqto
-    //create json from option map
-    def json = new groovy.json.JsonOutput().toJson(options)
-    debuglog json
-    //write configuration to MQTT broker
-    interfaces.mqtt.publish("${ratgdo_topic_prefix}/${doorName}/set-config", json)
-    //refresh config from broker
-    interfaces.mqtt.publish("${ratgdo_topic_prefix}/${doorName}/command", "get-config") 
+    // def options = [:]
+    // if (rdt) options.rdt = rdt
+    // if (mtt) options.mtt = mtt
+    // if (rlt) options.rlt = rlt
+    // if (rlp) options.rlp = rlp
+    // if (srt) options.srt = srt
+    // if (mqip) options.mqip = mqip
+    // if (mqpt) options.mqpt = mqpt
+    // if (mqto) options.mqto = mqto
+    // //create json from option map
+    // def json = new groovy.json.JsonOutput().toJson(options)
+    // debuglog json
+    // //write configuration to MQTT broker
+    // interfaces.mqtt.publish("${ratgdo_topic_prefix}/${doorName}/set-config", json)
+    // //refresh config from broker
+    // interfaces.mqtt.publish("${ratgdo_topic_prefix}/${doorName}/command", "get-config") 
 }
 
 void open() {
-    infolog "Open command sent..."
+    infolog "Open command sent to device..."
+    debuglog "'open' command sent to topic ${ratgdo_topic_prefix}/${doorName}/command/door"
     watchDog()
     interfaces.mqtt.publish("${ratgdo_topic_prefix}/${doorName}/command/door", "open")
 }
 void close() {
     infolog "Close command sent..."
+    debuglog "'close' command sent to topic ${ratgdo_topic_prefix}/${doorName}/command/door"
     watchDog()
     interfaces.mqtt.publish("${ratgdo_topic_prefix}/${doorName}/command/door", "close")
 }
@@ -468,29 +488,33 @@ void close() {
 
 def lock(){
     infolog "Lock command sent..."
+    debuglog "'lock' command sent to topic ${ratgdo_topic_prefix}/${doorName}/command/lock"
     watchDog()
     interfaces.mqtt.publish("${ratgdo_topic_prefix}/${doorName}/command/lock", "lock")
 }
 
 def unlock(){
     infolog "Unlock command sent..."
+    debuglog "'unlock' command sent to topic ${ratgdo_topic_prefix}/${doorName}/command/lock"
     watchDog()
     interfaces.mqtt.publish("${ratgdo_topic_prefix}/${doorName}/command/lock", "unlock")
 }
 
 void on() {
     infolog "Light on command sent..."
+    debuglog "'on' command sent to topic ${ratgdo_topic_prefix}/${doorName}/command/light"
     watchDog()
     interfaces.mqtt.publish("${ratgdo_topic_prefix}/${doorName}/command/light", "on")
-    // debuglog "On sent, turn garage light on..."
-    // open()
+// debuglog "On sent, turn garage light on..."
+// open()
 }
 void off() {
     infolog "Light off command sent..."
+    debuglog "'off' command sent to topic ${ratgdo_topic_prefix}/${doorName}/command/light"
     watchDog()
     interfaces.mqtt.publish("${ratgdo_topic_prefix}/${doorName}/command/light", "off")
-    // debuglog "Off sent, turn garage light off..."  
-    // close()
+// debuglog "Off sent, turn garage light off..."  
+// close()
 }
 
 
