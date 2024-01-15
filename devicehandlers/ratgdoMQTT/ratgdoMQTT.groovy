@@ -9,7 +9,6 @@
  * 0.9.6 - 12/11/23 - Test of HPM update
  * 0.9.5 - 12/11/23 - Initial HPM Release
  */
-git config pull.rebase false
 metadata {
     definition (name: "ratgdo MQTT", 
                 namespace: "edasque", 
